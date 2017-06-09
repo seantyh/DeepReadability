@@ -4,6 +4,7 @@ import pickle
 import keras
 import preproc
 import train_utils
+import setup_model
 
 DATA_DIR = "data"
 USE_SAVED = True
@@ -37,7 +38,7 @@ if __name__ == "__main__":
     tb_callback.set_model(model)
 
     # Training
-    EPOCH = 10
+    EPOCH = 5
     cost_vec = []
     acc_vec = []
     print("Training data: %d samples" % len(train_idx))

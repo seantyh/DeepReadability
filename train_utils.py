@@ -30,3 +30,17 @@ def test_model(model, data_idx, data, labels, VOCAB_SIZE):
         acc_vec.append(ret[1])
                         
     return (np.mean(cost_vec), np.mean(acc_vec))
+
+def predict_model(model, data_idx, data, VOCAB_SIZE):
+    text_mat = preproc.preproc_text_vec(data["text"], VOCAB_SIZE)
+    freq_vec = data["freq"]
+    stroke_vec = data["stroke"]  
+    ypred = []
+    for sample_idx in data_idx:
+        sample = text_mat[sample_idx]        
+        freq = freq_vec[sample_idx]
+        stroke = stroke_vec[sample_idx]
+        ret = model.predict_on_batch([np.array([sample]), np.array([freq]), np.array([stroke])])
+        ypred.append(np.argmax(ret))
+                        
+    return np.array(ypred)
