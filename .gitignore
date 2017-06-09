@@ -3,3 +3,5 @@
 *.swp
 default.cfg
 __pycache__/
+logs/
+model.h5

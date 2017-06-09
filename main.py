@@ -5,6 +5,7 @@ from keras.layers import Input, Dense, Activation, Embedding
 from keras.layers import LSTM
 import keras
 import preproc
+import train_utils
 
 DATA_DIR = "data"
 
@@ -51,8 +52,15 @@ if __name__ == "__main__":
                 metrics = ["accuracy"])
 
 
+    # Setting up logging function
+
+
+    ## tensorboard logging
+    tb_callback = keras.callbacks.TensorBoard("logs")
+    tb_callback.set_model(model)
+
     # Training
-    EPOCH = 10
+    EPOCH = 1
     cost_vec = []
     acc_vec = []
     print("Training data: %d samples" % len(train_idx))
@@ -66,15 +74,28 @@ if __name__ == "__main__":
             label = labels[sample_idx]
             freq = freq_vec[sample_idx]
             stroke = stroke_vec[sample_idx]
-            ret = model.train_on_batch([np.array([sample]), np.array([freq]), np.array([stroke])], 
+            ret = model.train_on_batch(
+                    [np.array([sample]), np.array([freq]), np.array([stroke])], 
                     keras.utils.to_categorical(label, 6))
             cost_vec.append(ret[0])
             acc_vec.append(ret[1])
-
-            print("[% 4d] cost: %s, accuracy: %.2f" % \
-                (counter, np.mean(cost_vec[-10:]), np.mean(acc_vec[-10:])))   
-            counter += 1
-            if counter > 3:
+            
+            global_iter = epoch_i * len(train_idx) + counter        
+            
+            mv_cost = np.mean(cost_vec[-10:])
+            mv_acc = np.mean(acc_vec[-10:])
+            if (global_iter + 1) % 10 == 0:
+                print("validating model...")
+                val_loss, val_acc = train_utils.test_model(
+                    model, test_idx, data, labels, VOCAB_SIZE)
+                print("Validation: loss: {:f}, acc: {:.2f}".format(val_loss, val_acc))
+                train_utils.write_log(tb_callback, global_iter, 
+                        ["loss", "accuracy", "val_loss", "val_accuracy"], 
+                        [mv_cost, mv_acc, val_loss, val_acc])
+                
+            if counter >= 3:
                 break   
+            print("[% 4d] cost: %s, accuracy: %.2f" % (counter, mv_cost, mv_acc))
+            counter += 1
 
-
+    model.save("model.h5")
