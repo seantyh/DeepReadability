@@ -1,3 +1,5 @@
 *~
 *.tmp
 *.swp
+default.cfg
+__pycache__/

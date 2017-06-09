@@ -1,55 +1,78 @@
-import numpy as np
 import pickle
+import codecs
+import glob
+import os
+import re
+import pdb
+import numpy as np
 
-def load_data(dir_path, seq_length = 200):
+def load_data(dir_path, seq_length = -1):
     stroke_vec = []
     freq_bracket = []
     text_mat = []
     labels = []
     freq_map = pickle.load(open("etc/chFreq.pickle", "rb"))
-    sorted_ch = sorted(freq_map.keys(), key = freq_map.get(), reverse=True)
-    vocab_map = {k: i+1 for k, i in enumerated(sorted_ch)}
+    sorted_ch = sorted(freq_map.keys(), key = freq_map.get, reverse=True)
+    vocab_map = {k: i+1 for i, k in enumerate(sorted_ch)}
     stroke_map = load_stroke_data("etc/Unihan_DictionaryLikeData.txt")
+    params = {"vocab_map": vocab_map, "stroke_map": stroke_map, "seq_length": seq_length}
 
-    for fpath in glob.glob("*.txt"):
+    for fpath in glob.glob(os.path.join(dir_path, "*.txt")):
         text = load_text(fpath)
-        txt, freqs, stks = transform_document(text)
-        text_map.append(txt)
+        txt, freqs, stks = transform_document(text, params)
+        text_mat.append(txt)
         freq_bracket.append(freqs)
-        strokes.append(stks)
-        label_x = int(re.search("_G(\d)_", fpath).group(1))  
+        stroke_vec.append(stks)
+        label_x = int(re.search("_G(\\d)_", fpath).group(1))  
         labels.append(label_x)
-
+        print(fpath)
+        
     data = {"freq": np.array(freq_bracket), 
             "stroke": np.array(stroke_vec), 
-            "text": np.array(text_mat)}
-    return data, np.array(label)
+            "text": np.array(text_mat)}    
+    return data, np.array(labels)
 
-def transform_document(text):
-    v1 = transform_text(text, vocab_map, seq_length))
+def load_text(fpath):
+    return open(fpath, "r", encoding="UTF-8").read()
+
+def transform_document(text, params):
+    vocab_map = params.get("vocab_map")
+    stroke_map = params.get("stroke_map")
+    seq_length = params.get("seq_length")
+    v1 = transform_text(text, vocab_map, seq_length)
     v2 = get_freq_bracket(text, vocab_map)
     v3 = get_stroke_bracket(text, stroke_map)
           
     return v1, v2, v3
 
 def transform_text(text, vocab_map, seq_length):
-    text_vec = [0] * seq_length
+    text_vec = []
+    if seq_length < 0:        
+        vec_len = -1
+    else:        
+        vec_len = seq_length
+
     counter = -1
     for ch in text:        
         idx = vocab_map.get(ch, -1)
         if idx < 0: continue
-        counter += 1
-        text_vec[counter] = idx
-        if counter == seq_length - 1:
+        counter += 1                
+        text_vec.append(idx)
+        if counter == vec_len - 1:
             break
+    
+    while counter < vec_len - 1:
+        text_vec.append(0)
+        counter += 1
+
     return text_vec
 
 
 def get_freq_bracket(text, vocab_map):
     rank_vec = [0, 0, 0]
     for ch in text:
-        rank = vocab_map.get(ch, -1):
-        if freq < 0: continue
+        rank = vocab_map.get(ch, -1)
+        if rank < 0: continue
         if rank > 0 and rank <= 1500:
             rank_vec[0] += 1
         elif rank > 1500 and rank <= 3000:
@@ -81,6 +104,6 @@ def load_stroke_data(fpath):
             cp = toks[0].replace("U+", "")            
             if len(cp) > 4: continue
             ch = codecs.decode(cp.encode(), "hex").decode("UTF-16BE")
-            stroke_map[ch] = toks[2].strip()
+            stroke_map[ch] = int(toks[2].split()[0])
     return stroke_map
     
