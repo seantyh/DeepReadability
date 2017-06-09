@@ -1,17 +1,16 @@
 import numpy as np
 import pickle
-from keras.models import Sequential, Model
-from keras.layers import Input, Dense, Activation, Embedding
-from keras.layers import LSTM
+
 import keras
 import preproc
 import train_utils
 
 DATA_DIR = "data"
+USE_SAVED = True
 
 if __name__ == "__main__":
     # Prepare training data
-    VOCAB_SIZE = 3000
+    VOCAB_SIZE = 2500
     data, labels = pickle.load(open(DATA_DIR + "/train_data.pyObj", "rb"))
     labels = labels - 1
     freq_vec = data["freq"]
@@ -19,37 +18,15 @@ if __name__ == "__main__":
 
     np.random.seed(125655)
     rand_idx = np.random.permutation(range(len(labels)))
-    train_idx = rand_idx[:int(len(rand_idx) * 0.6)]
-    cv_idx = rand_idx[int(len(rand_idx) * 0.6):int(len(rand_idx) * 0.2)]
+    train_idx = rand_idx[:int(len(rand_idx) * 0.8)]    
     test_idx = rand_idx[int(len(rand_idx) * 0.8):]
     text_mat = preproc.preproc_text_vec(data["text"], VOCAB_SIZE)
     
     # Model building
-    # define input layers
-    input_text = Input(shape=(None, ), name="input_text")
-    input_freq = Input(shape=(4,), name="input_freq")
-    input_stroke = Input(shape=(3,), name="input_stroke")
-
-    # embedding layers for text
-    embed = Embedding(VOCAB_SIZE, 100)(input_text)
-    lstm = LSTM(40)(embed)
-
-    # dense for freq/stroke
-    input_fs = keras.layers.concatenate([input_freq, input_stroke])
-    dense1 = Dense(3, activation="sigmoid")(input_fs)
-
-    # concatenate sequence layers and other two inputs
-    concat = keras.layers.concatenate([lstm, dense1])
-
-    # connect to outputs
-    grade_out = Dense(6, activation="softmax")(concat)
-
-    model = Model(inputs = [input_text, input_freq, input_stroke], 
-                outputs = [grade_out])
-
-    model.compile(optimizer = 'rmsprop', 
-                loss="categorical_crossentropy", 
-                metrics = ["accuracy"])
+    if USE_SAVED:
+        model = keras.models.load_model("model.h5")
+    else:
+        model = setup_model.setup_model(VOCAB_SIZE)
 
 
     # Setting up logging function
@@ -60,7 +37,7 @@ if __name__ == "__main__":
     tb_callback.set_model(model)
 
     # Training
-    EPOCH = 1
+    EPOCH = 10
     cost_vec = []
     acc_vec = []
     print("Training data: %d samples" % len(train_idx))
@@ -74,6 +51,8 @@ if __name__ == "__main__":
             label = labels[sample_idx]
             freq = freq_vec[sample_idx]
             stroke = stroke_vec[sample_idx]
+            freq = freq / np.sum(freq)
+            stroke = stroke/np.sum(stroke)
             ret = model.train_on_batch(
                     [np.array([sample]), np.array([freq]), np.array([stroke])], 
                     keras.utils.to_categorical(label, 6))
@@ -82,19 +61,22 @@ if __name__ == "__main__":
             
             global_iter = epoch_i * len(train_idx) + counter        
             
-            mv_cost = np.mean(cost_vec[-10:])
-            mv_acc = np.mean(acc_vec[-10:])
-            if (global_iter + 1) % 10 == 0:
+            mv_cost = np.mean(cost_vec[-100:])
+            mv_acc = np.mean(acc_vec[-100:])
+            if (global_iter + 1) % 100 == 0:
+                train_utils.write_log(tb_callback, global_iter, 
+                        ["loss", "accuracy"], [mv_cost, mv_acc])
+
+            if (global_iter + 1) % 500 == 0:                        
                 print("validating model...")
                 val_loss, val_acc = train_utils.test_model(
                     model, test_idx, data, labels, VOCAB_SIZE)
                 print("Validation: loss: {:f}, acc: {:.2f}".format(val_loss, val_acc))
                 train_utils.write_log(tb_callback, global_iter, 
-                        ["loss", "accuracy", "val_loss", "val_accuracy"], 
-                        [mv_cost, mv_acc, val_loss, val_acc])
-                
-            if counter >= 3:
-                break   
+                        ["val_loss", "val_accuracy"], [val_loss, val_acc])    
+
+            # if counter >= 3:
+            #     break   
             print("[% 4d] cost: %s, accuracy: %.2f" % (counter, mv_cost, mv_acc))
             counter += 1
 
