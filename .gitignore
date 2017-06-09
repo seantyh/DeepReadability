@@ -2,6 +2,7 @@
 *.tmp
 *.swp
 .*/
+data/
 model_*.h5
 default.cfg
 __pycache__/
