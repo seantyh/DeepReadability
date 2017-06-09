@@ -69,16 +69,18 @@ def transform_text(text, vocab_map, seq_length):
 
 
 def get_freq_bracket(text, vocab_map):
-    rank_vec = [0, 0, 0]
+    rank_vec = [0, 0, 0, 0]
     for ch in text:
         rank = vocab_map.get(ch, -1)
         if rank < 0: continue
-        if rank > 0 and rank <= 1500:
+        if rank > 0 and rank <= 1000:
             rank_vec[0] += 1
-        elif rank > 1500 and rank <= 3000:
+        elif rank > 1000 and rank <= 2000:
             rank_vec[1] += 1
-        else:
+        elif rank > 2000 and rank <= 3500:
             rank_vec[2] += 1
+        else:
+            rank_vec[3] += 1
     return rank_vec
 
 def get_stroke_bracket(text, stroke_map):
